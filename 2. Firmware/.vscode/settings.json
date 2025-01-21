@@ -1,0 +1,22 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.flashType": "UART",
+  "idf.portWin": "COM4",
+  "idf.adapterTargetName": "esp32",
+  "idf.openOcdConfigs": [
+    "board/esp32-wrover-kit-3.3v.cfg"
+  ],
+  "files.associations": {
+    "esp_log.h": "c",
+    "main.h": "c",
+    "esp_spiffs.h": "c",
+    "esp_event.h": "c",
+    "chrono": "c",
+    "functional": "c",
+    "spiffs_config.h": "c",
+    "cstdint": "c",
+    "gps_data.h": "c",
+    "main_gps.h": "c",
+    "nvs_and_spiffs.h": "c"
+  }
+}
