@@ -17,6 +17,13 @@
     "cstdint": "c",
     "gps_data.h": "c",
     "main_gps.h": "c",
-    "nvs_and_spiffs.h": "c"
+    "nvs_and_spiffs.h": "c",
+    "gsm_sim800l.h": "c",
+    "esp_adc_cal.h": "c",
+    "gpio.h": "c",
+    "bme280.h": "c",
+    "*.tcc": "c",
+    "adc.h": "c",
+    "uart.h": "c"
   }
 }

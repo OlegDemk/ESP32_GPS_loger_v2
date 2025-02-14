@@ -9,6 +9,7 @@
 #define MAIN_GSM_GSM_SIM800L_H_
 
 #include "../main.h"
+#include "../i2c/pca9536d/pca9536d.h"
 
 static const int RX_BUF_SIZE = 1024;
 

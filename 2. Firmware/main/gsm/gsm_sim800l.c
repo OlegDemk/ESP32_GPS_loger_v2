@@ -59,29 +59,28 @@ void turn_OFF_power_of_gsm_module(void)
 // GSM commands handlers
 void command_1_turn_on_gps_log_handler(void)
 {
-	make_blink(3, 200, 10);
+	make_led_blink(BLUE_LED, 200, 10);    
 
 	gps_log_on();
 }
 // ------------------------------------------------------------------------------------------------------------
 void command_2_turn_off_gps_log_handler(void)
 {
-	make_blink(3, 50, 10);
+	make_led_blink(BLUE_LED, 50, 10);
 	
 	gps_log_off();
 }
 // ------------------------------------------------------------------------------------------------------------
 void command_3_send_one_point_gps_data_handler(void)
 {
-	make_blink(3, 20, 10);
+	make_led_blink(BLUE_LED, 20, 0);
 
 	send_one_point_gps_data();
 }
 // ------------------------------------------------------------------------------------------------------------
 void command_4_restart_handler(void)
 {
-	make_blink(3, 20, 10);
-
+	make_led_blink(BLUE_LED, 20, 10);
 	restart_all_esp32();
 }
 // ------------------------------------------------------------------------------------------------------------

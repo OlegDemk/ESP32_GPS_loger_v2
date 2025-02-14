@@ -25,6 +25,9 @@ QueueHandle_t GPS_queue = NULL;
 #define QUEUE_LENGHT_BATTERY 1
 QueueHandle_t battery_queue = NULL;
 
+extern QueueHandle_t i2c_queue;
+
+// extern struct bme280_data_t;
 
 // ------------------------------------------------------------------------------------------------------------------
 void task_resurse_monitor(void *ignore)
@@ -50,9 +53,9 @@ void task_blink(void *ignore)				// For debug
 {
 	while(1)
 	{
-		gpio_set_level(CONFIG_BLUE_GPIO, 1);
-		vTaskDelay(50 / portTICK_PERIOD_MS);
-		gpio_set_level(CONFIG_BLUE_GPIO, 0);
+		// gpio_set_level(CONFIG_BLUE_GPIO, 1);
+		// vTaskDelay(50 / portTICK_PERIOD_MS);
+		// gpio_set_level(CONFIG_BLUE_GPIO, 0);
 		vTaskDelay(950 / portTICK_PERIOD_MS);
 	}
 }
@@ -60,80 +63,117 @@ void task_blink(void *ignore)				// For debug
 void task_bme280(void *ignore)
 {
 	static const char *TAG_BME280 = "BME280";
-
 	bme280_thp_t bme280_thp_queue;
+	bme280_data_t bme280_data;
 
-	i2c_master_init_BME280();
-
-	struct bme280_t bme280 = {
-		.bus_write = BME280_I2C_bus_write,
-		.bus_read = BME280_I2C_bus_read,
-		.dev_addr = BME280_I2C_ADDRESS2,
-		.delay_msec = BME280_delay_msek
-	};
-
-	s32 com_rslt;
-	s32 v_uncomp_pressure_s32;
-	s32 v_uncomp_temperature_s32;
-	s32 v_uncomp_humidity_s32;
-
-	com_rslt = bme280_init(&bme280);
-
-	com_rslt += bme280_set_oversamp_pressure(BME280_OVERSAMP_16X);
-	com_rslt += bme280_set_oversamp_temperature(BME280_OVERSAMP_2X);
-	com_rslt += bme280_set_oversamp_humidity(BME280_OVERSAMP_1X);
-	com_rslt += bme280_set_standby_durn(BME280_STANDBY_TIME_1_MS);
-	com_rslt += bme280_set_filter(BME280_FILTER_COEFF_16);
-
-	com_rslt += bme280_set_power_mode(BME280_NORMAL_MODE);
-
-	if (com_rslt == SUCCESS)
+	while(1)
 	{
-		while(true)
+		bme280_test_read_thp(&bme280_data);  // Передати вказівник на структуру в функцію
+
+		ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", bme280_data.temperature, bme280_data.pressure, bme280_data.humidity);		
+
+		bme280_thp_queue.temperature = bme280_data.temperature;
+		bme280_thp_queue.humidity = bme280_data.humidity;
+		bme280_thp_queue.preassure = bme280_data.pressure;
+
+		BaseType_t result = xQueueSend(bme280_queue, (void*)&bme280_thp_queue, pdMS_TO_TICKS(100));
+		if(result == pdPASS)
 		{
-			com_rslt = bme280_read_uncomp_pressure_temperature_humidity(
-				&v_uncomp_pressure_s32, &v_uncomp_temperature_s32, &v_uncomp_humidity_s32);
-
-			if (com_rslt == SUCCESS)
-			{
-				double t = bme280_compensate_temperature_double(v_uncomp_temperature_s32);
-				double p = bme280_compensate_pressure_double(v_uncomp_pressure_s32)/100;
-				double h = bme280_compensate_humidity_double(v_uncomp_humidity_s32);
-
-				bme280_thp_queue.temperature = t;
-				bme280_thp_queue.humidity = h;
-				bme280_thp_queue.preassure = p;
-
-				BaseType_t result = xQueueSend(bme280_queue, (void*)&bme280_thp_queue, pdMS_TO_TICKS(100));
-				if(result == pdPASS)
-				{
-					ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
-				}
-				else if(result == errQUEUE_FULL)
-				{
-					ESP_LOGE(TAG_BME280, "The queue is full");		 
-				}
-				else
-				{
-					ESP_LOGE(TAG_BME280, "Failed send BME280 data");
-				}
-
-
-				ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", t, p, h);
-			}
-			else
-			{
-				ESP_LOGE(TAG_BME280, "measure error. code: %d", com_rslt);
-			}
-
-			vTaskDelay(1000/portTICK_PERIOD_MS);
+			ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
 		}
+		else if(result == errQUEUE_FULL)
+		{
+			ESP_LOGE(TAG_BME280, "The queue is full");		 
+		}
+		else
+		{
+			ESP_LOGE(TAG_BME280, "Failed send BME280 data");
+		}
+		//ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", t, p, h);
+
+		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
-	else
-	{
-		ESP_LOGE(TAG_BME280, "init or setting error. code: %d", com_rslt);
-	}
-	vTaskDelete(NULL);
+
+
+
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	// static const char *TAG_BME280 = "BME280";
+
+	// bme280_thp_t bme280_thp_queue;
+
+	// i2c_master_init_BME280();
+
+	// struct bme280_t bme280 = {
+	// 	.bus_write = BME280_I2C_bus_write,
+	// 	.bus_read = BME280_I2C_bus_read,
+	// 	.dev_addr = BME280_I2C_ADDRESS2,
+	// 	.delay_msec = BME280_delay_msek
+	// };
+
+	// s32 com_rslt;
+	// s32 v_uncomp_pressure_s32;
+	// s32 v_uncomp_temperature_s32;
+	// s32 v_uncomp_humidity_s32;
+
+	// com_rslt = bme280_init(&bme280);
+
+	// com_rslt += bme280_set_oversamp_pressure(BME280_OVERSAMP_16X);
+	// com_rslt += bme280_set_oversamp_temperature(BME280_OVERSAMP_2X);
+	// com_rslt += bme280_set_oversamp_humidity(BME280_OVERSAMP_1X);
+	// com_rslt += bme280_set_standby_durn(BME280_STANDBY_TIME_1_MS);
+	// com_rslt += bme280_set_filter(BME280_FILTER_COEFF_16);
+
+	// com_rslt += bme280_set_power_mode(BME280_NORMAL_MODE);
+
+	// if (com_rslt == SUCCESS)
+	// {
+	// 	while(true)
+	// 	{
+	// 		com_rslt = bme280_read_uncomp_pressure_temperature_humidity(
+	// 			&v_uncomp_pressure_s32, &v_uncomp_temperature_s32, &v_uncomp_humidity_s32);
+
+	// 		if (com_rslt == SUCCESS)
+	// 		{
+	// 			double t = bme280_compensate_temperature_double(v_uncomp_temperature_s32);
+	// 			double p = bme280_compensate_pressure_double(v_uncomp_pressure_s32)/100;
+	// 			double h = bme280_compensate_humidity_double(v_uncomp_humidity_s32);
+
+	// 			bme280_thp_queue.temperature = t;
+	// 			bme280_thp_queue.humidity = h;
+	// 			bme280_thp_queue.preassure = p;
+
+	// 			BaseType_t result = xQueueSend(bme280_queue, (void*)&bme280_thp_queue, pdMS_TO_TICKS(100));
+	// 			if(result == pdPASS)
+	// 			{
+	// 				ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
+	// 			}
+	// 			else if(result == errQUEUE_FULL)
+	// 			{
+	// 				ESP_LOGE(TAG_BME280, "The queue is full");		 
+	// 			}
+	// 			else
+	// 			{
+	// 				ESP_LOGE(TAG_BME280, "Failed send BME280 data");
+	// 			}
+
+
+	// 			ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", t, p, h);
+	// 		}
+	// 		else
+	// 		{
+	// 			ESP_LOGE(TAG_BME280, "measure error. code: %d", com_rslt);
+	// 		}
+
+	// 		vTaskDelay(1000/portTICK_PERIOD_MS);
+	// 	}
+	// }
+	// else
+	// {
+	// 	ESP_LOGE(TAG_BME280, "init or setting error. code: %d", com_rslt);
+	// }
+	// vTaskDelete(NULL);
+
 }
 // -------------------------------------------------------------------------------------------------------------------
 void send_sms_message_plus_battery_level(char *message)
@@ -184,7 +224,7 @@ void task_log_data_into_file(void *ignore)
 		if(qStatus == pdPASS)
 		{
 			show_gps_data(&gps_data);
-			gps_signal_led_indication(&gps_data);
+			// gps_signal_led_indication(&gps_data);    Зробити індикацію з використанням PCA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			send_data_to_client(&gps_data);													
 
 			if(gps_data_incoming_counter == log_data_save_period)							// SaveGPS data periodically
@@ -236,7 +276,7 @@ void task_get_gps_data_one_time(void* ignode)
 		qStatus = xQueueReceive(gps_data_log_queue, &gps_data, 1000/portTICK_PERIOD_MS);	// Receive GPS dsta from GPS
 		if(qStatus == pdPASS)
 		{
-			gps_signal_led_indication(&gps_data);
+			// gps_signal_led_indication(&gps_data);     Зробити індикацію з використанням PCA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			show_gps_data(&gps_data);
 			
 			int status = check_gps_data_valid(&gps_data); 
@@ -403,38 +443,64 @@ void app_main(void)
 	}
 
 
+	// I2C  //////////////////////////////////////////////////////////
+	bme280_data_t bme280_data; // 
+
+	i2c_queue = xQueueCreate(I2C_QUEUE_LENGTH, I2C_QUEUE_ITEM_SIZE);
+	if(i2c_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create I2C queue");
+		return;
+	}
+
+	i2c_master_init();
+	xTaskCreate(i2c_manager_task, "I2C_Manager", 4096, NULL, configMAX_PRIORITIES-1, NULL);
+	i2c_staner();     
+
+	vTaskDelay(10 / portTICK_PERIOD_MS);
+
+	bme280_test_read_thp(&bme280_data);			// T, H and P
+	test_rtc_ds3231m();							// Time
+	test_pca9536d();							// LEDs and button
+	oled_print_text("HELLO", 0, 5);				
+	///////////////////////////////////////////////////////////////////
+
+
+	const char* base_path = "/data";
+    ESP_ERROR_CHECK(example_mount_storage(base_path));		
+
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+
+	init_http_server();
+	//init_http_server_new();
+
+	xTaskCreate(task_battery_data, "task_battery_data", 4096, NULL, configMAX_PRIORITIES - 2, &task_battery_data_handle);
+    xTaskCreate(task_blink, "task_blink", 1024, NULL, configMAX_PRIORITIES - 3, &task_led_blink_handler);
+    xTaskCreate(task_bme280, "task_bme280", 4096, NULL, configMAX_PRIORITIES - 2, &task_bme280_handlr);
+    xTaskCreate(task_resurse_monitor, "task_resurse_monitor", 4096, NULL, configMAX_PRIORITIES - 3, &task_resurse_monitor_handlr);
+
+	vTaskDelay(2000 / portTICK_PERIOD_MS);
+	xTaskCreate(task_gsm, "task_gsm", 4096, NULL, configMAX_PRIORITIES - 1, &task_gsm_handler);
+
 	
 
-	test_pca9536d();
-
-
-    // init_output_gpio();
-	// //RGB_LEDs_blink(5, 25);
-
-	// const char* base_path = "/data";
-    // ESP_ERROR_CHECK(example_mount_storage(base_path));		
-
-	// init_http_server();
-	// // init_http_server_new();
-
-	// xTaskCreate(task_battery_data, "task_battery_data", 4096, NULL, configMAX_PRIORITIES - 2, &task_battery_data_handle);
-    // xTaskCreate(task_blink, "task_blink", 1024, NULL, configMAX_PRIORITIES - 3, &task_led_blink_handler);
-    // xTaskCreate(task_bme280, "task_bme280", 4096, NULL, configMAX_PRIORITIES - 2, &task_bme280_handlr);
-    // xTaskCreate(task_resurse_monitor, "task_resurse_monitor", 4096, NULL, configMAX_PRIORITIES - 3, &task_resurse_monitor_handlr);
-
-	// vTaskDelay(2000 / portTICK_PERIOD_MS);
-	// xTaskCreate(task_gsm, "task_gsm", 4096, NULL, configMAX_PRIORITIES - 1, &task_gsm_handler);
 
 	
-
-
-
 
 
 
 /*
+	Вигляд дисплею
+	1.	Рядок час і дата з внутрішнього RTC (його налаштувати через сторінну або через GPS), і заряд батереї.
+	2.  Статус роботи, Час роботи (дні, години, хвилини, секунди)
+	3. 	Вивести IP сервера ESP32, до якого можна підключитися.
+	4.	
+	5. 
+
 	CURRENT:
-		
+		1. Вивести дату і час на 0 рядок дисплею
+		2. 
+
 		4. Переробити на новий веб сервер.
 		1. Запускати HTTP server з SMS командою.
 
@@ -444,8 +510,6 @@ void app_main(void)
 	TASKS:
 		4. Зробити реалізацію кнопки старту і стопу запису GPS даних. (кнопка має знати стан GPS логера, чи він включений чи ні) Додати кнопки LogON logOFF і point
 		3. Добавити можливість налаштування підключення до вибраного AP.
-		
-		
 		3. При скачуванні файла додеється знак "_" перед назвою файла.
 		7. Логування даних в консоль. Порифакторити всі LOG_TAGs 
 		10. Рефакторити код в main.c, позабирати лишні функції в різні папки і файли
@@ -468,8 +532,8 @@ void app_main(void)
 			E (163603) diskio_sdmmc: sdmmc_read_blocks failed (0x108)
 		2. Записувати мій номер в конфізі.
 		2. Залити проект з VS Code і новою версією плати на ГітХАБ
+		3. Зробити інтерфейс запису і стирання даних на дисплей
 
 */
-
 }
 // ------------------------------------------------------------------------------------------------------------------

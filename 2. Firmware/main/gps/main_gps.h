@@ -9,6 +9,7 @@
 #define MAIN_GPS_MAIN_GPS_H_
 
 #include "../main.h"
+#include "../gps_data.h"
 
 void turn_on_gps(void);
 void turn_off_gps(void);

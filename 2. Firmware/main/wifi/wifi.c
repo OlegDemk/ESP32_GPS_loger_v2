@@ -233,6 +233,13 @@ esp_err_t wifi_init_sta(void)
 			ret = esp_netif_get_ip_info(netif, &ip);
 			ESP_LOGI(TAG, "esp_netif_get_ip_info : %d", ret);
 			ESP_LOGI(TAG, "- IPv4 address: " IPSTR, IP2STR(&ip.ip));
+
+			// Print connected name and IP
+			char buff[20] = {0};
+			snprintf(buff, sizeof(buff), "IP:" IPSTR, IP2STR(&ip.ip));
+			ESP_LOGI(TAG, "------------------------------------- > %s", buff);
+			oled_print_text(buff, 1, 0);	
+
 		}
 	}
 	return ESP_OK;
