@@ -24,6 +24,7 @@
     "bme280.h": "c",
     "*.tcc": "c",
     "adc.h": "c",
-    "uart.h": "c"
+    "uart.h": "c",
+    "cstdlib": "c"
   }
 }

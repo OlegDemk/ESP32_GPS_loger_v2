@@ -471,19 +471,16 @@ void app_main(void)
 
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 
-	init_http_server();
-	//init_http_server_new();
-
 	xTaskCreate(task_battery_data, "task_battery_data", 4096, NULL, configMAX_PRIORITIES - 2, &task_battery_data_handle);
     xTaskCreate(task_blink, "task_blink", 1024, NULL, configMAX_PRIORITIES - 3, &task_led_blink_handler);
     xTaskCreate(task_bme280, "task_bme280", 4096, NULL, configMAX_PRIORITIES - 2, &task_bme280_handlr);
     xTaskCreate(task_resurse_monitor, "task_resurse_monitor", 4096, NULL, configMAX_PRIORITIES - 3, &task_resurse_monitor_handlr);
 
-	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	xTaskCreate(task_gsm, "task_gsm", 4096, NULL, configMAX_PRIORITIES - 1, &task_gsm_handler);
-
+	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	
-
+	init_http_server();
+	//init_http_server_new();
 
 	
 
