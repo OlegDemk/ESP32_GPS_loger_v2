@@ -403,7 +403,7 @@ void app_main(void)
 
 
 	const char* base_path = "/data";
-    ESP_ERROR_CHECK(example_mount_storage(base_path));		
+    ESP_ERROR_CHECK(example_mount_storage(base_path));			
 
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 
@@ -423,15 +423,7 @@ void app_main(void)
 	
 
 
-	// Додати нормальний STA http сервер !!!!
-
-
-
-	// wifi_start();
-
 	
-
-
 
 
 

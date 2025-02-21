@@ -75,7 +75,7 @@
 #define ON 1
 #define OFF 0
 
-#define SMS_FITBACK ON
+#define SMS_FITBACK OFF
 
 // ------------------------------------------------------------------------------------------
 typedef struct {

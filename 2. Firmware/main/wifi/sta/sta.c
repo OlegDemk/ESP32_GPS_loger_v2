@@ -37,6 +37,7 @@ void wifi_init_sta(const char *ssid, const char *password)
     ESP_LOGI(TAG, "WiFi STA mode initialized with SSID:%s", ssid);
 }
 // -----------------------------------------------------------------------------------------------------
+
 static const char* get_path_from_uri(char *dest, const char *base_path, const char *uri, size_t destsize)
 {
     const size_t base_pathlen = strlen(base_path);
@@ -44,8 +45,7 @@ static const char* get_path_from_uri(char *dest, const char *base_path, const ch
 
     const char *quest = strchr(uri, '?');
     if (quest) {
-        // pathlen = MIN(pathlen, quest - uri);
-        pathlen = quest - uri; // Обрізати `?` та все після нього
+        pathlen = MIN(pathlen, quest - uri);
     }
     const char *hash = strchr(uri, '#');
     if (hash) {
@@ -231,9 +231,14 @@ static esp_err_t get_file_list_handler(httpd_req_t *req)
 	    httpd_resp_sendstr_chunk(req, "</td>");
 	    
 	    // Додаємо кнопку "Delete"
-	    httpd_resp_sendstr_chunk(req, "<td><form method=\"get\" action=\"/delete/");
-	    httpd_resp_sendstr_chunk(req, entry->d_name);
-	    httpd_resp_sendstr_chunk(req, "\"><button type=\"submit\">Delete</button></form></td>");
+	    // httpd_resp_sendstr_chunk(req, "<td><form method=\"get\" action=\"/delete/");
+	    // httpd_resp_sendstr_chunk(req, entry->d_name);
+	    // httpd_resp_sendstr_chunk(req, "\"><button type=\"submit\">Delete</button></form></td>");
+
+        httpd_resp_sendstr_chunk(req, "<td><form method=\"get\" action=\"/delete/");
+        httpd_resp_sendstr_chunk(req, entry->d_name);
+        httpd_resp_sendstr_chunk(req, "\" onsubmit=\"return confirm('Are you sure?')\">");
+        httpd_resp_sendstr_chunk(req, "<button type=\"submit\">Delete</button></form></td>");
 	    
 	    // Додаємо кнопку "Download"
 	    httpd_resp_sendstr_chunk(req, "<td><form method=\"get\" action=\"/download/");
@@ -442,6 +447,7 @@ httpd_handle_t NEW_start_webserver_sta(void)
 	httpd_handle_t server = NULL;
 	httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 	config.lru_purge_enable = true;
+    config.max_uri_handlers = 12;
 
     init_ipsffs_memory();       // Тут записаний файл text/html
 	
@@ -512,13 +518,7 @@ httpd_handle_t NEW_start_webserver_sta(void)
     	.handler = get_file_list_handler
 	};
 	
-	httpd_uri_t delete_file_uri = {
-    	.uri = "/delete/*",  // Маршрут для видалення файлів
-    	.method = HTTP_GET,
-    	.handler = delete_file_handler
-	};
-	
-	httpd_uri_t download_file_uri = {
+    httpd_uri_t download_file_uri = {
 		.uri = "/download/*",
 		.method = HTTP_GET,
 		.handler = download_file_handler
@@ -530,7 +530,15 @@ httpd_handle_t NEW_start_webserver_sta(void)
 		.handler = reset_device_handler
 	};
 
-    
+	httpd_uri_t delete_file_uri = {
+    	.uri = "/delete/*",             // Маршрут для видалення файлів
+    	.method = HTTP_GET,
+    	.handler = delete_file_handler,
+        .user_ctx = NULL
+	};
+	
+    ESP_LOGI(TAG, "Number of registered handlers: %d", config.max_uri_handlers);    // Must be more than handlers below.
+  
 	httpd_register_uri_handler(server, &index_html_uri);
     httpd_register_uri_handler(server, &reset_device_uri);
 	httpd_register_uri_handler(server, &status_get_bme280_data_uri);
@@ -540,7 +548,6 @@ httpd_handle_t NEW_start_webserver_sta(void)
     httpd_register_uri_handler(server, &file_list_uri);
     httpd_register_uri_handler(server, &download_file_uri);
     httpd_register_uri_handler(server, &delete_file_uri);
-    
   
  	return server;
 }

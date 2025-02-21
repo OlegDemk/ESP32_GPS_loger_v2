@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/CMakeFiles/bootloader"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/CMakeFiles/bootloader.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/CMakeFiles/bootloader-complete.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
+		},
+		{
+			"file" : "D:/work/ESP32/Log project/2. ESP32 GPS loger v2/2. Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"bootloader"
+		],
+		"name" : "bootloader"
+	}
+}
