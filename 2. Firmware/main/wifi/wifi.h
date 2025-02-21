@@ -1,26 +1,12 @@
-/*
- * wifi.h
- *
- *  Created on: May 18, 2023
- *      Author: odemki
- */
 
-#ifndef MAIN_WIFI_WIFI_H_
-#define MAIN_WIFI_WIFI_H_
+#pragma once
 
-#include <stdio.h>
-#include "string.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#include "driver/gpio.h"
-#include "esp_log.h"
-#include "esp_event.h"
-#include "esp_wifi.h"
-#include "freertos/event_groups.h"
-#include "http.h"
+#include "../main.h"
 
 
-esp_err_t wifi_init_sta(void);
+void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+void stop_webserver(httpd_handle_t *server_handle);
 
-#endif /* MAIN_WIFI_WIFI_H_ */
+void save_wifi_config(const char *ssid, const char *password);
+void get_saved_wifi_config(char *ssid, char *password);
+void wifi_start(void);

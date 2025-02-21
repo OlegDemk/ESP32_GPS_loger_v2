@@ -33,31 +33,44 @@
 // ------------------------------------------------------------------------------------------------------------------
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "microsd/mount.h"
 // ------------------------------------------------------------------------------------------------------------------
-#include "driver/uart.h"
-#include "gps/main_gps.h"
-#include "gps/nmea_parser.h"
+
 // ------------------------------------------------------------------------------------------------------------------
-#include "gsm/gsm_sim800l.h"
+
 // ------------------------------------------------------------------------------------------------------------------
 #include "esp_spiffs.h"
 #include "spiffs_config.h"
 #include "esp_netif.h"
 #include "esp_event.h"
-#include "wifi/http.h"
-#include "wifi/wifi.h"
+// ------------------------------------------------------------------------------------------------------------------
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
+// ------------------------------------------------------------------------------------------------------------------
+#include "gps_data.h"
+#include "driver/uart.h"
+#include "gps/main_gps.h"
+#include "gps/nmea_parser.h"
+// ------------------------------------------------------------------------------------------------------------------
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "nvs_flash.h"
+#include "esp_log.h"
+#include "esp_system.h"
+#include "esp_http_server.h"
+
+#include "WiFi/sta/sta.h"
+#include "WiFi/ap/ap.h"
+#include "WiFi/wifi.h"
 // ------------------------------------------------------------------------------------------------------------------
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "buttery/buttery.h"
 // ------------------------------------------------------------------------------------------------------------------
-#include "gps_data.h"
+#include "gsm/gsm_sim800l.h"
 // ------------------------------------------------------------------------------------------------------------------
-
-
+#include "memory/nvs_and_spiffs.h"
 // ------------------------------------------------------------------------------------------------------------------
-
+#include "microsd/mount.h"
 
 #define ON 1
 #define OFF 0
@@ -76,13 +89,11 @@ typedef struct{
 } battery_t;
 // ------------------------------------------------------------------------------------------
 
-void gps_log_on(void);
-void gps_log_off(void);
-void send_one_point_gps_data(void);
-void restart_all_esp32(void);
 
 void task_log_data_into_file(void *ignore);
+void increment_counter_task(void *pvParameter);
 void send_sms_message_plus_battery_level(char *message);
-void stop_http_server(void);
+void task_get_gps_data_one_time(void* ignode);
+void restart_all_esp32(void);
 
 #endif // MAIN_H

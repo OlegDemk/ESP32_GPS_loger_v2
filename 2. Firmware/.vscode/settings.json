@@ -25,6 +25,8 @@
     "*.tcc": "c",
     "adc.h": "c",
     "uart.h": "c",
-    "cstdlib": "c"
+    "cstdlib": "c",
+    "nvs_flash.h": "c",
+    "sta.h": "c"
   }
 }

@@ -1,17 +1,13 @@
 #include "main.h"
 
-
-uint8_t raad_barrety_level(void);
-
-
 // Task handlers
-TaskHandle_t task_bme280_handlr;
-TaskHandle_t task_led_blink_handler;
 TaskHandle_t task_resurse_monitor_handlr;
-TaskHandle_t task_log_data_into_file_handlr;
-TaskHandle_t task_gsm_handler;
-TaskHandle_t task_get_gps_data_one_time_handler;
+TaskHandle_t task_led_blink_handler;
 TaskHandle_t task_battery_data_handle;
+TaskHandle_t task_get_gps_data_one_time_handler;
+TaskHandle_t task_gsm_handler;
+TaskHandle_t task_log_data_into_file_handlr;
+TaskHandle_t task_bme280_handlr;
 
 // Queues
 QueueHandle_t gps_data_log_queue = NULL;
@@ -22,44 +18,12 @@ QueueHandle_t bme280_queue = NULL;
 #define QUEUE_LENGHT_GPS 1
 QueueHandle_t GPS_queue = NULL;
 
+extern QueueHandle_t i2c_queue;
+
 #define QUEUE_LENGHT_BATTERY 1
 QueueHandle_t battery_queue = NULL;
 
-extern QueueHandle_t i2c_queue;
-
-// extern struct bme280_data_t;
-
-// ------------------------------------------------------------------------------------------------------------------
-void task_resurse_monitor(void *ignore)
-{
-	while(1)
-	{
-        char status[1024] = {0,};
-
-		// Shows: name of tasks, status, priority, free stack size and task number on each tasks
-		vTaskList(status);
-		ESP_LOGI("\033[1;36mTaskList", "\n%s\033[1;36m", status);
-
-        // Shows: spend time cheduller on each tasks
-        memset(status, 0, sizeof(status));
-        vTaskGetRunTimeStats(status);
-        ESP_LOGI("\033[1;36mRunTimeStats", "\n%s\033[1;36m", status);
-
-		vTaskDelay(15000/portTICK_PERIOD_MS);		
-	}
-}
-// ------------------------------------------------------------------------------------------------------------------
-void task_blink(void *ignore)				// For debug
-{
-	while(1)
-	{
-		// gpio_set_level(CONFIG_BLUE_GPIO, 1);
-		// vTaskDelay(50 / portTICK_PERIOD_MS);
-		// gpio_set_level(CONFIG_BLUE_GPIO, 0);
-		vTaskDelay(950 / portTICK_PERIOD_MS);
-	}
-}
-// ------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------
 void task_bme280(void *ignore)
 {
 	static const char *TAG_BME280 = "BME280";
@@ -93,89 +57,18 @@ void task_bme280(void *ignore)
 
 		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
-
-
-
-
-	/////////////////////////////////////////////////////////////////////////////////////
-	// static const char *TAG_BME280 = "BME280";
-
-	// bme280_thp_t bme280_thp_queue;
-
-	// i2c_master_init_BME280();
-
-	// struct bme280_t bme280 = {
-	// 	.bus_write = BME280_I2C_bus_write,
-	// 	.bus_read = BME280_I2C_bus_read,
-	// 	.dev_addr = BME280_I2C_ADDRESS2,
-	// 	.delay_msec = BME280_delay_msek
-	// };
-
-	// s32 com_rslt;
-	// s32 v_uncomp_pressure_s32;
-	// s32 v_uncomp_temperature_s32;
-	// s32 v_uncomp_humidity_s32;
-
-	// com_rslt = bme280_init(&bme280);
-
-	// com_rslt += bme280_set_oversamp_pressure(BME280_OVERSAMP_16X);
-	// com_rslt += bme280_set_oversamp_temperature(BME280_OVERSAMP_2X);
-	// com_rslt += bme280_set_oversamp_humidity(BME280_OVERSAMP_1X);
-	// com_rslt += bme280_set_standby_durn(BME280_STANDBY_TIME_1_MS);
-	// com_rslt += bme280_set_filter(BME280_FILTER_COEFF_16);
-
-	// com_rslt += bme280_set_power_mode(BME280_NORMAL_MODE);
-
-	// if (com_rslt == SUCCESS)
-	// {
-	// 	while(true)
-	// 	{
-	// 		com_rslt = bme280_read_uncomp_pressure_temperature_humidity(
-	// 			&v_uncomp_pressure_s32, &v_uncomp_temperature_s32, &v_uncomp_humidity_s32);
-
-	// 		if (com_rslt == SUCCESS)
-	// 		{
-	// 			double t = bme280_compensate_temperature_double(v_uncomp_temperature_s32);
-	// 			double p = bme280_compensate_pressure_double(v_uncomp_pressure_s32)/100;
-	// 			double h = bme280_compensate_humidity_double(v_uncomp_humidity_s32);
-
-	// 			bme280_thp_queue.temperature = t;
-	// 			bme280_thp_queue.humidity = h;
-	// 			bme280_thp_queue.preassure = p;
-
-	// 			BaseType_t result = xQueueSend(bme280_queue, (void*)&bme280_thp_queue, pdMS_TO_TICKS(100));
-	// 			if(result == pdPASS)
-	// 			{
-	// 				ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
-	// 			}
-	// 			else if(result == errQUEUE_FULL)
-	// 			{
-	// 				ESP_LOGE(TAG_BME280, "The queue is full");		 
-	// 			}
-	// 			else
-	// 			{
-	// 				ESP_LOGE(TAG_BME280, "Failed send BME280 data");
-	// 			}
-
-
-	// 			ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", t, p, h);
-	// 		}
-	// 		else
-	// 		{
-	// 			ESP_LOGE(TAG_BME280, "measure error. code: %d", com_rslt);
-	// 		}
-
-	// 		vTaskDelay(1000/portTICK_PERIOD_MS);
-	// 	}
-	// }
-	// else
-	// {
-	// 	ESP_LOGE(TAG_BME280, "init or setting error. code: %d", com_rslt);
-	// }
-	// vTaskDelete(NULL);
-
 }
-// -------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------
+void restart_all_esp32(void)
+{
+	turn_off_gps_module();
+	#if SMS_FITBACK == ON
+		send_sms_message_plus_battery_level("Restarting...");
+	#endif
+	
+	esp_restart();
+}
+// ----------------------------------------------------------------------------------------------
 void send_sms_message_plus_battery_level(char *message)
 {
 	//	Add battery level to sms
@@ -185,8 +78,7 @@ void send_sms_message_plus_battery_level(char *message)
 	snprintf(buff_sms_str, sizeof(buff_sms_str), "%s Bat: %d%%", message, battery_level);
 	send_sms(CONFIG_MY_MOBILE_NUMBER, buff_sms_str);
 }
-// -------------------------------------------------------------------------------------------------------------------
-
+// ----------------------------------------------------------------------------------------------
 bool init_gps_status_flag = false;
 bool gps_log_working_flag = false;
 
@@ -308,7 +200,95 @@ void task_get_gps_data_one_time(void* ignode)
 		}
 	}
 }
-// ----------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------
+void task_battery_data(void *ignore)
+{
+	const static char *TAG_BATTERY = "BATTERY TASK";
+
+	battery_t batterty;
+	batterty.battery_level = 0;
+
+	while(1)
+	{
+		batterty.battery_level = raad_barrety_level();  
+
+		// передача даних для http сервера
+		BaseType_t result = xQueueSend(battery_queue, (void*)&batterty, pdMS_TO_TICKS(100));
+		if(result == pdPASS)
+		{
+			ESP_LOGI(TAG_BATTERY, "Send battery data: %d", batterty.battery_level);
+		}
+		else if(result == errQUEUE_FULL)
+		{
+			ESP_LOGE(TAG_BATTERY, "The queue is full");		
+		}
+		else
+		{
+			ESP_LOGE(TAG_BATTERY, "Failed send battery data");
+		}
+		
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+// ------------------------------------------------------------------------------------------------------------------
+void task_blink(void *ignore)				// For debug
+{
+	while(1)
+	{
+		set_led(GREEN_LED, LED_ON);
+		vTaskDelay(50 / portTICK_PERIOD_MS);
+		set_led(GREEN_LED, LED_OFF);
+		vTaskDelay(100 / portTICK_PERIOD_MS);
+		set_led(GREEN_LED, LED_ON);
+		vTaskDelay(50 / portTICK_PERIOD_MS);
+		set_led(GREEN_LED, LED_OFF);
+		vTaskDelay(1750 / portTICK_PERIOD_MS);
+	}
+}
+// ------------------------------------------------------------------------------------------------------------------
+void task_resurse_monitor(void *ignore)
+{
+	while(1)
+	{
+        char status[1024] = {0,};
+
+		// Shows: name of tasks, status, priority, free stack size and task number on each tasks
+		vTaskList(status);
+		ESP_LOGI("\033[1;36mTaskList", "\n%s\033[1;36m", status);
+
+        // Shows: spend time cheduller on each tasks
+        memset(status, 0, sizeof(status));
+        vTaskGetRunTimeStats(status);
+        ESP_LOGI("\033[1;36mRunTimeStats", "\n%s\033[1;36m", status);
+
+		vTaskDelay(15000/portTICK_PERIOD_MS);		
+	}
+}
+// ---------------------------------------------------------------------------------------------------------------------------------------
+TaskHandle_t increment_counter_task_handler;
+int counter = 0; 
+
+void increment_counter_task(void *pvParameter)
+{
+    while(1) 
+    {
+        counter++;
+        ESP_LOGI("COUNTER TASK", "Counter: %d", counter);
+        vTaskDelay(pdMS_TO_TICKS(1000));  
+    }
+}
+// ---------------------------------------------------------------------------------------------------------------------------------------
+void init_nvs(void)
+{
+    esp_err_t ret = nvs_flash_init();
+    if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+}
+// ---------------------------------------------------------------------------------------------------------------------------------------
 void task_gsm(void *ignore)
 {
 	static const char *GSM_TAG = "GSM";
@@ -375,66 +355,23 @@ void task_gsm(void *ignore)
 }
 // ------------------------------------------------------------------------------------------
 
-void restart_all_esp32(void)
-{
-	turn_off_gps_module();
-	#if SMS_FITBACK == ON
-		send_sms_message_plus_battery_level("Restarting...");
-	#endif
-	
-	esp_restart();
-}
-// ------------------------------------------------------------------------------------------
 
-
-
-
-// ------------------------------------------------------------------------------------------------------------
-void task_battery_data(void *ignore)
-{
-	const static char *TAG_BATTERY = "BATTERY TASK";
-
-	battery_t batterty;
-	batterty.battery_level = 0;
-
-	while(1)
-	{
-		batterty.battery_level = raad_barrety_level();  
-
-		BaseType_t result = xQueueSend(battery_queue, (void*)&batterty, pdMS_TO_TICKS(100));
-		if(result == pdPASS)
-		{
-			ESP_LOGI(TAG_BATTERY, "Send battery data: %d", batterty.battery_level);
-		}
-		else if(result == errQUEUE_FULL)
-		{
-			ESP_LOGE(TAG_BATTERY, "The queue is full");		
-		}
-		else
-		{
-			ESP_LOGE(TAG_BATTERY, "Failed send battery data");
-		}
-		
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
-}
-// ----------------------------------------------------------------------------------------------------------------------------------------
 void app_main(void)
 {
-	bme280_queue = xQueueCreate(QUEUE_LENGHT_BME280, sizeof(bme280_thp_t)); 
-	if(bme280_queue == NULL)
-	{
-		ESP_LOGE("CREATE QUEUE" ,"Failed create bme280 queue");
-		return;
-	}
-	
 	GPS_queue = xQueueCreate(QUEUE_LENGHT_GPS, sizeof(gps_data_gps_t)); 
 	if(GPS_queue == NULL)
 	{
 		ESP_LOGE("CREATE QUEUE" ,"Failed create GPS_queue queue");
 		return;
 	}
-	
+
+	bme280_queue = xQueueCreate(QUEUE_LENGHT_BME280, sizeof(bme280_thp_t)); 
+	if(bme280_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create bme280 queue");
+		return;
+	}
+
 	battery_queue = xQueueCreate(QUEUE_LENGHT_BATTERY, sizeof(battery_t)); 
 	if(battery_queue == NULL)
 	{
@@ -442,9 +379,8 @@ void app_main(void)
 		return;
 	}
 
-
 	// I2C  //////////////////////////////////////////////////////////
-	bme280_data_t bme280_data; // 
+	bme280_data_t bme280_data; 
 
 	i2c_queue = xQueueCreate(I2C_QUEUE_LENGTH, I2C_QUEUE_ITEM_SIZE);
 	if(i2c_queue == NULL)
@@ -452,17 +388,17 @@ void app_main(void)
 		ESP_LOGE("CREATE QUEUE" ,"Failed create I2C queue");
 		return;
 	}
-
 	i2c_master_init();
 	xTaskCreate(i2c_manager_task, "I2C_Manager", 4096, NULL, configMAX_PRIORITIES-1, NULL);
 	i2c_staner();     
 
+	/////////////////////////////////////////////////////////////////
 	vTaskDelay(10 / portTICK_PERIOD_MS);
-
+	oled_print_text("HELLO", 0, 5);				
 	bme280_test_read_thp(&bme280_data);			// T, H and P
 	test_rtc_ds3231m();							// Time
 	test_pca9536d();							// LEDs and button
-	oled_print_text("HELLO", 0, 5);				
+	init_nvs();
 	///////////////////////////////////////////////////////////////////
 
 
@@ -471,19 +407,71 @@ void app_main(void)
 
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 
-	xTaskCreate(task_battery_data, "task_battery_data", 4096, NULL, configMAX_PRIORITIES - 2, &task_battery_data_handle);
-    xTaskCreate(task_blink, "task_blink", 1024, NULL, configMAX_PRIORITIES - 3, &task_led_blink_handler);
-    xTaskCreate(task_bme280, "task_bme280", 4096, NULL, configMAX_PRIORITIES - 2, &task_bme280_handlr);
+
+	wifi_start();
+
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
+	
     xTaskCreate(task_resurse_monitor, "task_resurse_monitor", 4096, NULL, configMAX_PRIORITIES - 3, &task_resurse_monitor_handlr);
+	xTaskCreate(task_blink, "task_blink", 1024, NULL, configMAX_PRIORITIES - 3, &task_led_blink_handler);
+	xTaskCreate(task_battery_data, "task_battery_data", 4096, NULL, configMAX_PRIORITIES - 2, &task_battery_data_handle);
+	xTaskCreate(task_bme280, "task_bme280", 4096, NULL, configMAX_PRIORITIES - 2, &task_bme280_handlr);
 
 	xTaskCreate(task_gsm, "task_gsm", 4096, NULL, configMAX_PRIORITIES - 1, &task_gsm_handler);
-	vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+
 	
-	init_http_server();
+
+
+	// Додати нормальний STA http сервер !!!!
+
+
+
+	// wifi_start();
+
+	
+
+
+
+
+
+
+
+
+
+
+
+	/* ЗАГАЛЬНИЙ АЛГОРИТМ
+	1. Ініціаціалізація.
+		1. OLED
+		2. BME280 (відображати T, H, P на екрані постійно)
+		3. RTC (відображати годину і дату на екрані постійно)
+		4. PCA9536 (показати статус на екрані) (Мигнути всіма ледами)
+		5. Micro SD card (показати статус на екрані)
+		6. Battery (показувати заряд на екрані постійно)
+		7. GSM module (воказати статус готовності на екрані) (показувати рівень сигналу на екрані постійно)
+		8. NVS
+
+	2. Чекати на дію(команду)	
+		1. Команда: Прийом SMS (Включити/виключити логування, вхідний звінок, взнати миттєву геолокацію)
+		2. Команда: Прийом SMS (Запустити/Виключити WIFi)
+			1. Якщо збережені в память SSOD і password коректні:
+				Підключитися до мережі у вигляді STA.
+				Запустити HTTP server.
+			2. Якщо підключитись до мережі не вдалось.
+				Запустити AP.
+				Запустити HTTP server для вводу нового SSOD і password.
+		2. Коротке утримання кнопки > 1 секунда (Включити Wifi) 
+		3. Довге утримання кнопки > 5 секунди (Виключити Wifi)
+		а як запустити процес логування кнопкою?????????
+	*/
+	
+	
+
 	//init_http_server_new();
 
 	
-
+	
 
 
 /*

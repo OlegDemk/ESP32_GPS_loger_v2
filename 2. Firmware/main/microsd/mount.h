@@ -10,6 +10,7 @@
 
 #include "../main.h"
 
+#include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
@@ -25,6 +26,7 @@
 #endif
 #include "sdmmc_cmd.h"
 #include "../gps_data.h"
+
 
 esp_err_t example_mount_storage(const char *base_path);
 uint8_t log_data(char* base_path, char* file_nmae, char* data, char* log_info);

@@ -1,249 +1,145 @@
-/*
- * wifi.c
- *
- *  Created on: May 18, 2023
- *      Author: odemki
- */
 #include "wifi.h"
 
+#define MAX_RETRY_COUNT 3
+
+httpd_handle_t ap_server_handle = NULL;
+httpd_handle_t sta_server_handle = NULL;
+
+int retry_count = 0;
+
+extern TaskHandle_t increment_counter_task_handler;
 
 
-#if CONFIG_WIFI_SCAN_METHOD_FAST
-#define WIFI_SCAN_METHOD WIFI_FAST_SCAN
-#elif CONFIG_WIFI_SCAN_METHOD_ALL_CHANNEL
-#define WIFI_SCAN_METHOD WIFI_ALL_CHANNEL_SCAN
-#endif
-//-------------------------------------------------------------
-#if CONFIG_WIFI_CONNECT_AP_BY_SIGNAL
-#define WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SIGNAL
-#elif CONFIG_WIFI_CONNECT_AP_BY_SECURITY
-#define WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SECURITY
-#endif
-//-------------------------------------------------------------
-#if CONFIG_WIFI_AUTH_OPEN
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_OPEN
-#elif CONFIG_WIFI_AUTH_WEP
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WEP
-#elif CONFIG_WIFI_AUTH_WPA_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_PSK
-#elif CONFIG_WIFI_AUTH_WPA2_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
-#elif CONFIG_WIFI_AUTH_WPA_WPA2_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
-#elif CONFIG_WIFI_AUTH_WPA2_ENTERPRISE
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_ENTERPRISE
-#elif CONFIG_WIFI_AUTH_WPA3_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA3_PSK
-#elif CONFIG_WIFI_AUTH_WPA2_WPA3_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
-#elif CONFIG_WIFI_AUTH_WAPI_PSK
-#define WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
-#endif
-//-------------------------------------------------------------
-static const char *TAG = "wifi";
-
-static SemaphoreHandle_t s_semph_get_ip_addrs;
-static esp_netif_t *s_esp_netif = NULL;
-static esp_ip4_addr_t s_ip_addr;
-static int s_active_interfaces = 0;
-
-// ----------------------------------------------------------------
-static void on_wifi_disconnect(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data)
+// -----------------------------------------------------------------------------------------------------
+void stop_webserver(httpd_handle_t *server_handle)
 {
-
-	 httpd_handle_t* server = (httpd_handle_t*) arg;
-	 if (*server) {
-		 ESP_LOGI(TAG, "Stopping webserver");
-		 stop_webserver(*server);
-		 *server = NULL;
-	 }
-
-	 ESP_LOGI(TAG, "Wi-Fi disconnected, trying to reconnect...");
-
-	 esp_err_t err = esp_wifi_connect();
-	 if (err == ESP_ERR_WIFI_NOT_STARTED) {
-	       return;
-	 }
-	 ESP_LOGI(TAG, "esp_wifi_connect() : %d", err);
-}
-//-------------------------------------------------------------
-static bool is_our_netif(const char *prefix, esp_netif_t *netif)
-{
-    return strncmp(prefix, esp_netif_get_desc(netif), strlen(prefix) - 1) == 0;
-}
-//-------------------------------------------------------------
-static void on_got_ip(void *arg, esp_event_base_t event_base,
-                      int32_t event_id, void *event_data)
-{
-	ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-
-	if (!is_our_netif(TAG, event->esp_netif))
-	{
-	      ESP_LOGW(TAG, "Got IPv4 from another interface \"%s\": ignored", esp_netif_get_desc(event->esp_netif));
-	      return;
-	}
-	ESP_LOGI(TAG, "Got IPv4 event: Interface \"%s\" address: " IPSTR, esp_netif_get_desc(event->esp_netif), IP2STR(&event->ip_info.ip));
-
-	memcpy(&s_ip_addr, &event->ip_info.ip, sizeof(s_ip_addr));
-
-	httpd_handle_t* server = (httpd_handle_t*) arg;
-	if (*server == NULL)
-	{
-		ESP_LOGI(TAG, "Starting webserver");
-		*server = start_webserver();
-	}
-	xSemaphoreGive(s_semph_get_ip_addrs);
-}
-// ----------------------------------------------------------------
-static esp_netif_t *wifi_start(void)
-{
-	esp_err_t ret;
-	char *desc;
-	static httpd_handle_t server = NULL;
-
-	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-	ret = esp_wifi_init(&cfg);
-	ESP_LOGI(TAG, "esp_wifi_init : %d", ret);
-
-	esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
-	asprintf(&desc, "%s: %s", TAG, esp_netif_config.if_desc);
-	esp_netif_config.if_desc = desc;
-
-	esp_netif_config.route_prio = 128;
-	esp_netif_t *netif = esp_netif_create_wifi(WIFI_IF_STA, &esp_netif_config);
-	free(desc);
-	esp_wifi_set_default_wifi_sta_handlers();
-
-	ret = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, &server);
-	ESP_LOGI(TAG, "esp_event_handler_register(WIFI_EVENT) : %d", ret);
-	ret = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, &server);
-	ESP_LOGI(TAG, "esp_event_handler_register(IP_EVENT) : %d", ret);
-
-	ret = esp_wifi_set_storage(WIFI_STORAGE_RAM);
-	ESP_LOGI(TAG, "esp_wifi_set_storage : %d", ret);
-
-	wifi_config_t wifi_config = {
-	      .sta = {
-	          .ssid = CONFIG_ESP_WIFI_SSID,
-	          .password = CONFIG_ESP_WIFI_PASSWORD,
-	          .scan_method = WIFI_SCAN_METHOD,
-	          .sort_method = WIFI_CONNECT_AP_SORT_METHOD,
-	          .threshold.rssi = CONFIG_WIFI_SCAN_RSSI_THRESHOLD,
-	          .threshold.authmode = WIFI_SCAN_AUTH_MODE_THRESHOLD,
-	      },
-	  };
-	ESP_LOGI(TAG, "Connecting to %s...", wifi_config.sta.ssid);
-
-	ret = esp_wifi_set_mode(WIFI_MODE_STA);
-	ESP_LOGI(TAG, "esp_wifi_set_mode : %d", ret);
-	ret = esp_wifi_set_ps(WIFI_PS_NONE);
-	ESP_LOGI(TAG, "esp_wifi_set_ps : %d", ret);
-	ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-	ESP_LOGI(TAG, "esp_wifi_set_config : %d", ret);
-
-	ret = esp_wifi_start();
-	ESP_LOGI(TAG, "esp_wifi_start : %d", ret);
-	esp_wifi_connect();
-	return netif;
-}
-// ----------------------------------------------------------------
-static esp_netif_t *get_example_netif_from_desc(const char *desc)
-{
-    esp_netif_t *netif = NULL;
-    char *expected_desc;
-    asprintf(&expected_desc, "%s: %s", TAG, desc);
-    while ((netif = esp_netif_next(netif)) != NULL) {
-        if (strcmp(esp_netif_get_desc(netif), expected_desc) == 0) {
-            free(expected_desc);
-            return netif;
-        }
+    if(*server_handle)
+    {
+        httpd_stop(*server_handle);
+        *server_handle = NULL;
     }
-    free(expected_desc);
-    return netif;
 }
-// ----------------------------------------------------------------
-static void wifi_stop(void)
+// -----------------------------------------------------------------------------------------------------
+void save_wifi_config(const char *ssid, const char *password)
 {
-  esp_err_t ret;
-  esp_netif_t *wifi_netif = get_example_netif_from_desc("sta");
-
-  ret = esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect);
-  ESP_LOGI(TAG, "esp_event_handler_unregister(WIFI_EVENT) : %d", ret);
-  ret = esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip);
-  ESP_LOGI(TAG, "esp_event_handler_unregister(IP_EVENT : %d", ret);
-
-  ret = esp_wifi_stop();
-  if (ret == ESP_ERR_WIFI_NOT_INIT) {
-        return;
-  }
-  ESP_LOGI(TAG, "esp_wifi_stop : %d", ret);
-
-  ret = esp_wifi_deinit();
-  ESP_LOGI(TAG, "esp_wifi_deinit : %d", ret);
-
-  ret = esp_wifi_clear_default_wifi_driver_and_handlers(wifi_netif);
-  ESP_LOGI(TAG, "esp_wifi_clear_default_wifi_driver_and_handlers : %d", ret);
-  esp_netif_destroy(wifi_netif);
-  s_esp_netif = NULL;
-
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &my_handle);
+    if(err == ESP_OK)
+    {
+        nvs_set_str(my_handle, "wifi_ssid", ssid);
+        nvs_set_str(my_handle, "wifi_password", password);
+        nvs_commit(my_handle);
+        nvs_close(my_handle);
+        ESP_LOGI("NVS","WiFi settings saved");
+    }
+    else
+    {
+        ESP_LOGE("NVS","ERROR");
+    }
 }
-// ----------------------------------------------------------------
-static void net_stop(void)
+// -----------------------------------------------------------------------------------------------------
+void get_saved_wifi_config(char *ssid, char *password)
 {
-	wifi_stop();
-	s_active_interfaces--;
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &my_handle);
+    if(err == ESP_OK)
+    {
+        size_t ssid_len = 32, passwors_len = 32;
+        nvs_get_str(my_handle, "wifi_ssid", ssid, &ssid_len);
+        nvs_get_str(my_handle, "wifi_password", password, &passwors_len);
+        nvs_close(my_handle);
+    }
+    else
+    {
+        ESP_LOGE("NVS","ERROR READ");
+    }
 }
-// ----------------------------------------------------------------
-static void net_start(void)
+// -----------------------------------------------------------------------------------------------------
+void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) 
 {
-	s_esp_netif = wifi_start();
-	s_active_interfaces++;
-	s_semph_get_ip_addrs = xSemaphoreCreateCounting(s_active_interfaces, 0);
-}
-// ----------------------------------------------------------------
-esp_err_t wifi_init_sta(void)
-{
-	esp_err_t ret;
+    static const char *TAG = "EVENT HANDLER";
 
-	if (s_semph_get_ip_addrs != NULL)
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    {
+        esp_wifi_connect();
+    } 
+    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) 
+    {
+        if (retry_count < MAX_RETRY_COUNT) 
+        {
+            ESP_LOGI(TAG, "WiFi disconnected, retrying... (Attempt %d/%d)", retry_count + 1, MAX_RETRY_COUNT);
+            esp_wifi_connect();
+            retry_count++;
+        } 
+        else 
+        {
+            stop_webserver(&sta_server_handle);
+
+            // Видалити задачу, якщо вона була створина до цього
+            if(increment_counter_task_handler != NULL)
+            {
+                vTaskDelete(increment_counter_task_handler);
+                increment_counter_task_handler = NULL;
+            }
+            
+            retry_count = 0;  // Скидаємо лічильник для майбутніх підключень
+
+            ESP_LOGI(TAG, "Max retry limit reached, switching to AP mode. <<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+            esp_wifi_stop();
+            start_wifi_ap();
+            //start_webserver_ap();
+            
+        }
+    } 
+    else if(event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) 
+    {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
+        ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+
+        // Print how to connect to STA server
+        // char ip_buff[60] = {0};
+        // snprintf(ip_buff, sizeof(ip_buff),  IPSTR "/counter", IP2STR(&event->ip_info.ip));
+        // ESP_LOGI(TAG, "Type into url: %s", ip_buff);
+
+        retry_count = 0;  // Скидаємо лічильник при успішному підключенні
+
+        ESP_LOGI(TAG, "START HTTP SERVER");                                                 // реагує в браузері на: http://192.168.0.137/counter <<<<<<<<<<<<<<<<<<<<<<<<,  
+        //start_webserver_sta();                          // Запуск HTTP-сервера 
+        NEW_start_webserver_sta();
+        xTaskCreate(&increment_counter_task, "increment_counter_task", 4096, NULL, 5, &increment_counter_task_handler);
+    }
+}
+// -----------------------------------------------------------------------------------------------------
+/*
+	@brief
+    	Run STA WiFi mode
+        If SSID and PASSWORD correct - connect to routrer, after that use another device, for example, PC connect to ESP32 use:
+          "http://192.168.0.137/counter" and get counter value into brouser. (See unic IP into comport).
+        If SSID and PASSWORD incorect -  turn off STA mode and run AP mode and run AP http server, and send simple http page "wifi_config_form".
+        Connect to ESP32 use "http://192.168.4.1/config" (It PI has to be static), after connect, into brouser will be simple html page. Write
+        new SSID and PASSWORD. Press "Submit" button, the new SSID and PASSWORD will be save into NVS memory and reser ESP32.
+*/
+void wifi_start(void)
+{
+    // Get ssid and password from memmory.
+	char ssid[32] = {0};
+	char password[32] = {0};
+	get_saved_wifi_config(ssid, password);
+
+	// If no any ssid and password.
+	if(strlen(ssid) > 0)
 	{
-		return ESP_ERR_INVALID_STATE;
+		// if settings was saved connect to annown WiFi network
+		ESP_LOGI("WIFI","Connect to WiFi...");
+		wifi_init_sta(ssid, password);
 	}
-	net_start();
-
-	ret = esp_register_shutdown_handler(&net_stop);
-	ESP_LOGI(TAG, "esp_register_shutdown_handler(&net_stop) : %d", ret);
-
-	for (int i = 0; i < s_active_interfaces; ++i)
+	else
 	{
-		xSemaphoreTake(s_semph_get_ip_addrs, portMAX_DELAY);
+		// If no annown WiFi data start AP   (Connect to "ESP32_Config" Acaes Point use "http://192.168.4.1/config" and set new SSID and PASSWORD)
+		ESP_LOGI("WIFI","MAKE Asses Popnt...");
+		start_wifi_ap();
+		start_webserver_ap();
 	}
-	
-	esp_netif_t *netif = NULL;
-	esp_netif_ip_info_t ip;
-
-	for(int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
-	{
-		netif = esp_netif_next(netif);
-
-		if(is_our_netif(TAG, netif))
-		{
-			ESP_LOGI(TAG, "Connected to %s", esp_netif_get_desc(netif));
-			ret = esp_netif_get_ip_info(netif, &ip);
-			ESP_LOGI(TAG, "esp_netif_get_ip_info : %d", ret);
-			ESP_LOGI(TAG, "- IPv4 address: " IPSTR, IP2STR(&ip.ip));
-
-			// Print connected name and IP
-			char buff[20] = {0};
-			snprintf(buff, sizeof(buff), "IP:" IPSTR, IP2STR(&ip.ip));
-			ESP_LOGI(TAG, "------------------------------------- > %s", buff);
-			oled_print_text(buff, 1, 0);	
-
-		}
-	}
-	return ESP_OK;
 }
-// ----------------------------------------------------------------
-
+// -----------------------------------------------------------------------------------------------------
 

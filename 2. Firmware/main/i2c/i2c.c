@@ -199,10 +199,8 @@ void i2c_staner(void)
 	for(int addr = 1; addr < 127; addr++)
 	{
 		uint8_t dummy_data = 0;
-		ESP_LOGD(TAG_I2C, "1111111111111111111111111");
 		esp_err_t err = i2c_request(addr, 0x00, &dummy_data, 1, true, true);
-		ESP_LOGD(TAG_I2C, "222222222222222222222222222");
-
+	
 		if(err == ESP_OK)
 		{
 			char *device_name = "Unknown device";
