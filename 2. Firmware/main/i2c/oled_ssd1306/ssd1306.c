@@ -154,3 +154,21 @@ void oled_print_text(char * text, uint8_t row, uint8_t col)
         oled_refresh(I2C_MASTER_NUM);
 }
 // -----------------------------------------------------------------------------------------------------
+void oled_clean_all(void)
+{
+        static bool init = false;    
+
+        if(init == false)
+        {       
+                ESP_LOGI(TAG,"INIT OLED");
+                oled_init(I2C_MASTER_NUM);
+                oled_clear();
+                init = true;
+                oled_refresh(I2C_MASTER_NUM);
+        }
+        oled_clear();
+        oled_refresh(I2C_MASTER_NUM);
+}
+// -----------------------------------------------------------------------------------------------------
+
+

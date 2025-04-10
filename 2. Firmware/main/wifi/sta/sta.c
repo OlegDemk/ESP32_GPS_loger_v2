@@ -7,6 +7,7 @@ extern QueueHandle_t battery_queue;
 extern httpd_handle_t sta_server_handle;
 extern QueueHandle_t GPS_queue;
 
+
 extern int counter;
 
 
@@ -444,13 +445,17 @@ static esp_err_t index_html_handler(httpd_req_t *req)
 // -----------------------------------------------------------------------------------------------------
 httpd_handle_t NEW_start_webserver_sta(void)
 {
+
+
 	httpd_handle_t server = NULL;
 	httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 	config.lru_purge_enable = true;
-    config.max_uri_handlers = 12;
+    config.max_uri_handlers = 12;           // how many handlers can be registered 
 
     init_ipsffs_memory();       // Тут записаний файл text/html
+
 	
+
 	static struct file_server_data *server_data = NULL;
 	if(server_data)
 	 {

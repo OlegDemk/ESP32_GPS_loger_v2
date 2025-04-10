@@ -38,8 +38,6 @@ void bme280_test_read_thp(bme280_data_t *data)
 		ESP_LOGE(TAG_BME280, "NULL pointer received !");
 	}
 
-	ESP_LOGI(TAG_BME280, "FUNCTION");
-
 	static s32 com_rslt;
 	s32 v_uncomp_pressure_s32;
 	s32 v_uncomp_temperature_s32;
@@ -98,7 +96,9 @@ void bme280_test_read_thp(bme280_data_t *data)
 			data->temperature = bme280_compensate_temperature_double(v_uncomp_temperature_s32);
 			data->pressure = bme280_compensate_pressure_double(v_uncomp_pressure_s32)/100;
 			data->humidity = bme280_compensate_humidity_double(v_uncomp_humidity_s32);
-			ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", data->temperature, data->pressure, data->humidity);
+			#if LOG_BME280
+				ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", data->temperature, data->pressure, data->humidity);
+			#endif
 		}
 		else
 		{

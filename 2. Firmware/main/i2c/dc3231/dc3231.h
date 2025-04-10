@@ -21,5 +21,7 @@ static const char *TAG_RTC = "RTC_DS3231M_DRIVER";
 
 
 esp_err_t i2c_master_init_rtc(void);
+esp_err_t ds3231m_get_time(uint8_t *hours, uint8_t *minutes, uint8_t *seconds);
+esp_err_t ds3231m_get_date(uint8_t *day, uint8_t *date, uint8_t *month, uint8_t *year);
 
 void test_rtc_ds3231m(void);

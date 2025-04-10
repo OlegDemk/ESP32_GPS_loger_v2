@@ -82,6 +82,8 @@ void oled_draw_rectangle(int width, int height, int x, int y, int color, bool fi
 esp_err_t ssd1306_read_register(uint8_t reg, uint8_t *value);
 void oled_print_text(char * text, uint8_t row, uint8_t col);
 void oled_test(void);
+void oled_clean_all(void);
+
 
 #endif /* MAIN_SSD1366_H_ */
 

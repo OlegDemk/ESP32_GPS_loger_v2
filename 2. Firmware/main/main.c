@@ -8,6 +8,8 @@ TaskHandle_t task_get_gps_data_one_time_handler;
 TaskHandle_t task_gsm_handler;
 TaskHandle_t task_log_data_into_file_handlr;
 TaskHandle_t task_bme280_handlr;
+TaskHandle_t task_dysplay_handlr;
+TaskHandle_t task_rts_dc3231_handlr;
 
 // Queues
 QueueHandle_t gps_data_log_queue = NULL;
@@ -20,8 +22,29 @@ QueueHandle_t GPS_queue = NULL;
 
 extern QueueHandle_t i2c_queue;
 
-#define QUEUE_LENGHT_BATTERY 1
+#define QUEUE_LENGHT_BATTERY 1	
 QueueHandle_t battery_queue = NULL;
+
+
+#define QUEUE_LENGHT_DYSPLA_RTC 5	
+QueueHandle_t dysplay_rtc_queue = NULL;
+
+#define QUEUE_LENGHT_DYSPLAY_BATTERY 5	
+QueueHandle_t dysplay_butery_queue = NULL;
+
+#define QUEUE_LENGHT_DYSPLAY_WIFI_MODE 5	
+QueueHandle_t dysplay_wifi_mode_and_ip_queue = NULL;
+
+#define QUEUE_LENGHT_DYSPLAY_GPS_DATA_ON_OLED 5	
+QueueHandle_t dysplay_gps_data_queue = NULL;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Log on/off defines
+#define LOG_BME280 0
+#define LOG_BATTERT_LEVEL 0
+#define LOG_RTC 0
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // ------------------------------------------------------------------------------------------
 void task_bme280(void *ignore)
@@ -34,7 +57,7 @@ void task_bme280(void *ignore)
 	{
 		bme280_test_read_thp(&bme280_data);  // Передати вказівник на структуру в функцію
 
-		ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", bme280_data.temperature, bme280_data.pressure, bme280_data.humidity);		
+		//ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", bme280_data.temperature, bme280_data.pressure, bme280_data.humidity);		
 
 		bme280_thp_queue.temperature = bme280_data.temperature;
 		bme280_thp_queue.humidity = bme280_data.humidity;
@@ -43,15 +66,19 @@ void task_bme280(void *ignore)
 		BaseType_t result = xQueueSend(bme280_queue, (void*)&bme280_thp_queue, pdMS_TO_TICKS(100));
 		if(result == pdPASS)
 		{
-			ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
+			//ESP_LOGI(TAG_BME280, "Send data: T:%.1f, H:%.1f, P:%.1f", bme280_thp_queue.temperature, bme280_thp_queue.humidity, bme280_thp_queue.preassure);
 		}
 		else if(result == errQUEUE_FULL)
 		{
-			ESP_LOGE(TAG_BME280, "The queue is full");		 
+			#if LOG_BME280
+				ESP_LOGE(TAG_BME280, "The queue is full");		
+			#endif 
 		}
 		else
 		{
-			ESP_LOGE(TAG_BME280, "Failed send BME280 data");
+			#if LOG_BME280
+				ESP_LOGE(TAG_BME280, "Failed send BME280 data");
+			#endif 
 		}
 		//ESP_LOGI(TAG_BME280, "%.2f degC / %.3f hPa / %.3f %%", t, p, h);
 
@@ -93,6 +120,8 @@ void task_log_data_into_file(void *ignore)
 	
 	gps_data_gps_t gps_data;
 	BaseType_t qStatus = false;
+
+	dysplay_gps_log_status_t dysplay_gps_log_status_data;   
 	
 	const char* base_path = "/data";
 	
@@ -115,6 +144,23 @@ void task_log_data_into_file(void *ignore)
 		qStatus = xQueueReceive(gps_data_log_queue, &gps_data, 1000/portTICK_PERIOD_MS);	// Receive GPS dsta from GPS
 		if(qStatus == pdPASS)
 		{
+			
+			// Send data to OLED task
+			dysplay_gps_log_status_data.latitude = gps_data.latitude;
+			dysplay_gps_log_status_data.longitude = gps_data.longitude;
+			dysplay_gps_log_status_data.sats_in_view = gps_data.sats_in_view;
+			dysplay_gps_log_status_data.seconds = gps_data.time.second;
+			dysplay_gps_log_status_data.minutes = gps_data.time.minute;
+			dysplay_gps_log_status_data.hours = gps_data.time.hour;
+			dysplay_gps_log_status_data.print_on_oled_status = 0; 
+
+
+			BaseType_t result = xQueueSend(dysplay_gps_data_queue, (void*)&dysplay_gps_log_status_data, pdMS_TO_TICKS(100));
+			// if(result == pdPASS)
+			// {
+			// 	ESP_LOGI(TAG_BATTERY, "Send battery data: %d", batterty.battery_level);
+			// }
+			
 			show_gps_data(&gps_data);
 			// gps_signal_led_indication(&gps_data);    Зробити індикацію з використанням PCA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			send_data_to_client(&gps_data);													
@@ -205,6 +251,7 @@ void task_battery_data(void *ignore)
 {
 	const static char *TAG_BATTERY = "BATTERY TASK";
 
+	dysplay_butery_t data;  
 	battery_t batterty;
 	batterty.battery_level = 0;
 
@@ -212,19 +259,28 @@ void task_battery_data(void *ignore)
 	{
 		batterty.battery_level = raad_barrety_level();  
 
+		data.battery = batterty.battery_level;
+		xQueueSend(dysplay_butery_queue, &data, pdMS_TO_TICKS(100));  // передати для екрнана
+
 		// передача даних для http сервера
 		BaseType_t result = xQueueSend(battery_queue, (void*)&batterty, pdMS_TO_TICKS(100));
 		if(result == pdPASS)
 		{
-			ESP_LOGI(TAG_BATTERY, "Send battery data: %d", batterty.battery_level);
+			#if LOG_BATTERT_LEVEL
+				ESP_LOGI(TAG_BATTERY, "Send battery data: %d", batterty.battery_level);
+			#endif
 		}
 		else if(result == errQUEUE_FULL)
 		{
-			ESP_LOGE(TAG_BATTERY, "The queue is full");		
+			#if LOG_BATTERT_LEVEL
+				ESP_LOGE(TAG_BATTERY, "The queue is full");	
+			#endif	
 		}
 		else
 		{
-			ESP_LOGE(TAG_BATTERY, "Failed send battery data");
+			#if LOG_BATTERT_LEVEL
+				ESP_LOGE(TAG_BATTERY, "Failed send battery data");
+			#endif
 		}
 		
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -265,18 +321,18 @@ void task_resurse_monitor(void *ignore)
 	}
 }
 // ---------------------------------------------------------------------------------------------------------------------------------------
-TaskHandle_t increment_counter_task_handler;
-int counter = 0; 
+// TaskHandle_t increment_counter_task_handler;
+// int counter = 0; 
 
-void increment_counter_task(void *pvParameter)
-{
-    while(1) 
-    {
-        counter++;
-        ESP_LOGI("COUNTER TASK", "Counter: %d", counter);
-        vTaskDelay(pdMS_TO_TICKS(1000));  
-    }
-}
+// void increment_counter_task(void *pvParameter)
+// {
+//     while(1) 
+//     {
+//         counter++;
+//         ESP_LOGI("COUNTER TASK", "Counter: %d", counter);
+//         vTaskDelay(pdMS_TO_TICKS(1000));  
+//     }
+// }
 // ---------------------------------------------------------------------------------------------------------------------------------------
 void init_nvs(void)
 {
@@ -354,10 +410,188 @@ void task_gsm(void *ignore)
 	}
 }
 // ------------------------------------------------------------------------------------------
+void task_rts_dc3231(void *ignore)
+{
+	dysplay_rtc_t data;
+	memset(&data, 0, sizeof(dysplay_rtc_t));
+	
+	while(1)
+	{
+		ds3231m_get_time(&data.hours, &data.minutes, &data.seconds);
+		ds3231m_get_date(&data.day, &data.date, &data.month, &data.year);
 
+		//ESP_LOGI("RTC", "Time: %d:%d:%d Date: %d.%d.%d <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", data.hours, data.minutes, data.seconds, data.date, data.month, data.year);
 
+		if(xQueueSend(dysplay_rtc_queue, &data, 0) != pdTRUE)
+		{
+			#if LOG_RTC
+				ESP_LOGE("RTC", "Failed to send to dysplay_queue");
+			#endif
+		}
+
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+// ------------------------------------------------------------------------------------------
+
+void task_dysplay(void *ignore)
+{
+	dysplay_rtc_t dysplay_rtc_data;
+	dysplay_rtc_t dysplay_prev_old_rtc_data;
+
+	dysplay_butery_t dysplay_battery_data;
+	dysplay_butery_t dysplay_prev_old_dysplay_battery_data;
+
+	dysplay_wifi_t dysplay_wifi_data;
+	dysplay_wifi_t dysplay_prev_old_dysplay_wifi_data;
+
+	dysplay_gps_log_status_t dysplay_gps_log_status_data;
+	dysplay_gps_log_status_t dysplay_prev_old_gps_log_status_data;
+
+	memset(&dysplay_rtc_data, 0, sizeof(dysplay_rtc_t));
+	memset(&dysplay_prev_old_rtc_data, 0, sizeof(dysplay_rtc_t));
+	
+	memset(&dysplay_battery_data, 0, sizeof(dysplay_butery_t));
+	memset(&dysplay_prev_old_dysplay_battery_data, 0, sizeof(dysplay_butery_t));
+
+	memset(&dysplay_wifi_data, 0, sizeof(dysplay_wifi_data));
+	memset(&dysplay_prev_old_dysplay_wifi_data, 0, sizeof(dysplay_wifi_data));
+
+	memset(&dysplay_gps_log_status_data, 0, sizeof(dysplay_gps_log_status_t));
+	memset(&dysplay_prev_old_gps_log_status_data, 0, sizeof(dysplay_gps_log_status_t));
+
+	oled_init(I2C_MASTER_NUM);
+	oled_clear();
+	oled_refresh(I2C_MASTER_NUM);
+	
+	while(1)
+	{
+		// Вивести нв OLED дані RTC
+		if(xQueueReceive(dysplay_rtc_queue, &dysplay_rtc_data, pdMS_TO_TICKS(10)))
+		{
+			if(memcmp(&dysplay_rtc_data, &dysplay_prev_old_rtc_data, sizeof(dysplay_rtc_t)) != 0)	// If data was changed
+			{
+				//oled_clean_all();
+				// Clean some part of dysplay
+				char row_dysplay_buffer[12] = "        ";
+				oled_print(row_dysplay_buffer, 0, 0, 1); 	
+				oled_print(row_dysplay_buffer, 1, 0, 1); 	
+				oled_refresh(I2C_MASTER_NUM);
+
+				// Print data on oled
+				sprintf(row_dysplay_buffer, "%d:%d:%d", dysplay_rtc_data.hours, dysplay_rtc_data.minutes, dysplay_rtc_data.seconds);
+				oled_print(row_dysplay_buffer, 0, 0, 1); 	// Print RTC time 
+				sprintf(row_dysplay_buffer, "%d.%d.%d", dysplay_rtc_data.date, dysplay_rtc_data.month, dysplay_rtc_data.year);
+				oled_print(row_dysplay_buffer, 1, 0, 1); 	// Print RTC date
+
+				oled_refresh(I2C_MASTER_NUM);
+				memcpy(&dysplay_prev_old_rtc_data, &dysplay_rtc_data, sizeof(dysplay_rtc_t));
+			}
+		}
+
+		// Вивести нв OLED дані рівня заряду батереї
+		if(xQueueReceive(dysplay_butery_queue, &dysplay_battery_data, pdMS_TO_TICKS(10)))
+		{
+			if(memcmp(&dysplay_battery_data, &dysplay_prev_old_dysplay_battery_data, sizeof(dysplay_butery_t)) != 0)	// If data was changed
+			{
+				// Clean 
+				char row_dysplay_buffer[8] = "       ";
+				oled_print(row_dysplay_buffer, 0, 9, 1); 	// Print RTC time level
+				oled_refresh(I2C_MASTER_NUM);
+
+				// Print data 
+				sprintf(row_dysplay_buffer, "BAT:%d", dysplay_battery_data.battery);
+				oled_print(row_dysplay_buffer, 0, 9, 1); 	// Print RTC time level
+
+				oled_refresh(I2C_MASTER_NUM);
+				memcpy(&dysplay_prev_old_dysplay_battery_data, &dysplay_battery_data, sizeof(dysplay_rtc_t));
+				
+			}
+		}
+		
+		// Вивести нв OLED дані режиму роботи WiFi i IP
+		if(xQueueReceive(dysplay_wifi_mode_and_ip_queue, &dysplay_wifi_data, pdMS_TO_TICKS(10)))
+		{
+			if(memcmp(&dysplay_wifi_data, &dysplay_prev_old_dysplay_wifi_data, sizeof(dysplay_wifi_t)) != 0)	// If data was changed
+			{
+				// Clean 
+				char row_dysplay_buffer[8] = "       ";
+				oled_print(row_dysplay_buffer, 1, 9, 1); 	
+				char row_dysplay_buffer_2[17] = "                 ";
+				oled_print(row_dysplay_buffer_2, 2, 0, 1);
+				oled_refresh(I2C_MASTER_NUM);
+
+				// Print data 
+				oled_print(dysplay_wifi_data.wifi_mode, 1, 9, 1); 	// Print WiFi mode
+				oled_print(dysplay_wifi_data.wifi_ip, 2, 0, 1); 	// Print WiFi IP
+
+				oled_refresh(I2C_MASTER_NUM);
+				memcpy(&dysplay_prev_old_dysplay_wifi_data, &dysplay_wifi_data, sizeof(dysplay_wifi_t));
+				
+			}
+		}
+
+		// Вивести нв OLED GPS дані та режим роботи логера
+		if(xQueueReceive(dysplay_gps_data_queue, &dysplay_gps_log_status_data, pdMS_TO_TICKS(10)))
+		{
+			int static log_seconds_counter = 0;
+
+			if(memcmp(&dysplay_gps_log_status_data, &dysplay_prev_old_gps_log_status_data, sizeof(dysplay_gps_log_status_t)) != 0)	// If data was changed
+			{
+				char buff[25] = {0};  
+
+				// Clean 
+				oled_print("                 ", 4, 0, 1); 	
+				oled_print("                 ", 5, 0, 1); 	
+				oled_print("                 ", 6, 0, 1); 
+				oled_print("                 ", 7, 0, 1); 
+				oled_refresh(I2C_MASTER_NUM);
+
+				// Print data 
+				// calculate how mutch time is gone after start gps log.
+				int seconds = log_seconds_counter % 60;
+				int minutes = (log_seconds_counter/60) % 60;
+				int hours = log_seconds_counter/3600;
+
+				snprintf(buff, sizeof(buff),"LOG: %d:%d:%d", hours, minutes, seconds);
+				oled_print(buff, 4, 0, 1); 
+
+				snprintf(buff, sizeof(buff),"%d:%d:%d SAT:%d", dysplay_gps_log_status_data.hours, dysplay_gps_log_status_data.minutes, dysplay_gps_log_status_data.seconds, dysplay_gps_log_status_data.sats_in_view);
+				oled_print(buff, 5, 0, 1); 	
+
+				memset(buff, 0,sizeof(buff));
+				snprintf(buff, sizeof(buff),"La: %.5f", dysplay_gps_log_status_data.latitude);
+				oled_print(buff, 6, 0, 1); 	
+
+				memset(buff, 0,sizeof(buff));
+				snprintf(buff, sizeof(buff),"Lo: %.5f", dysplay_gps_log_status_data.longitude); 
+				oled_print(buff, 7, 0, 1);
+
+				oled_refresh(I2C_MASTER_NUM);
+				memcpy(&dysplay_prev_old_dysplay_wifi_data, &dysplay_wifi_data, sizeof(dysplay_wifi_t));	
+
+				log_seconds_counter++;	
+
+				if(dysplay_gps_log_status_data.print_on_oled_status == 1)
+				{
+					log_seconds_counter = 0;
+
+					// Clean 
+					oled_print("                 ", 4, 0, 1); 
+					oled_print("                 ", 5, 0, 1); 	
+					oled_print("                 ", 6, 0, 1); 
+					oled_print("                 ", 7, 0, 1); 
+					oled_refresh(I2C_MASTER_NUM);
+				}
+			}
+		}
+		vTaskDelay(100 / portTICK_PERIOD_MS);
+	}
+}
+// ------------------------------------------------------------------------------------------
 void app_main(void)
 {
+	// Queue for http served
 	GPS_queue = xQueueCreate(QUEUE_LENGHT_GPS, sizeof(gps_data_gps_t)); 
 	if(GPS_queue == NULL)
 	{
@@ -375,9 +609,42 @@ void app_main(void)
 	battery_queue = xQueueCreate(QUEUE_LENGHT_BATTERY, sizeof(battery_t)); 
 	if(battery_queue == NULL)
 	{
-		ESP_LOGE("CREATE QUEUE" ,"Failed create GPS_queue queue");
+		ESP_LOGE("CREATE QUEUE" ,"Failed create battery_queue queue");
 		return;
 	}
+
+
+
+	///////////////////////////////////// DYSPLAY  ////////////////////////////////////////////
+	dysplay_rtc_queue = xQueueCreate(QUEUE_LENGHT_DYSPLA_RTC, sizeof(dysplay_rtc_t)); 
+	if(dysplay_rtc_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create dysplay_queue queue");
+		return;
+	}
+
+	dysplay_butery_queue = xQueueCreate(QUEUE_LENGHT_DYSPLAY_BATTERY, sizeof(dysplay_butery_t)); 
+	if(dysplay_butery_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create dysplay_battery queue");
+		return;
+	}
+
+	dysplay_wifi_mode_and_ip_queue = xQueueCreate(QUEUE_LENGHT_DYSPLAY_WIFI_MODE, sizeof(dysplay_wifi_t)); 
+	if(dysplay_wifi_mode_and_ip_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create dysplay_wifi_mode_and_ip_queue queue");
+		return;
+	}
+
+	dysplay_gps_data_queue = xQueueCreate(QUEUE_LENGHT_DYSPLAY_GPS_DATA_ON_OLED, sizeof(dysplay_gps_log_status_t)); 
+	if(dysplay_gps_data_queue == NULL)
+	{
+		ESP_LOGE("CREATE QUEUE" ,"Failed create dysplay_gps_data_queue queue");
+		return;
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////
+
 
 	// I2C  //////////////////////////////////////////////////////////
 	bme280_data_t bme280_data; 
@@ -394,7 +661,7 @@ void app_main(void)
 
 	/////////////////////////////////////////////////////////////////
 	vTaskDelay(10 / portTICK_PERIOD_MS);
-	oled_print_text("HELLO", 0, 5);				
+	//oled_print_text("HELLO", 0, 5);				
 	bme280_test_read_thp(&bme280_data);			// T, H and P
 	test_rtc_ds3231m();							// Time
 	test_pca9536d();							// LEDs and button
@@ -408,7 +675,7 @@ void app_main(void)
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 
 
-	wifi_start();
+	// wifi_start();
 
 	vTaskDelay(1000 / portTICK_PERIOD_MS);
 	
@@ -419,19 +686,25 @@ void app_main(void)
 
 	xTaskCreate(task_gsm, "task_gsm", 4096, NULL, configMAX_PRIORITIES - 1, &task_gsm_handler);
 
-
+	xTaskCreate(task_dysplay, "task_dysplay", 4096, NULL, configMAX_PRIORITIES - 3, &task_dysplay_handlr);  		
+	xTaskCreate(task_rts_dc3231, "task_rts_dc3231", 4096, NULL, configMAX_PRIORITIES - 3, &task_rts_dc3231_handlr);
+	
 	
 
 
+
+
+
+
+
+
+	//
+	// BUG: Коли включити Wifi виключити і знову включити відбувається перезагрузка ESP
+	// BUG:  BUG: При зсіні STA на AP потрібно перезавантажити дівайс, оскільки  http://192.168.4.1/config не працює !!!!!
+	// 
+
+
 	
-
-
-
-
-
-
-
-
 
 	/* ЗАГАЛЬНИЙ АЛГОРИТМ
 	1. Ініціаціалізація.
@@ -459,30 +732,19 @@ void app_main(void)
 	*/
 	
 	
-
-	//init_http_server_new();
+ 
 
 	
 	
 
 
 /*
-	Вигляд дисплею
-	1.	Рядок час і дата з внутрішнього RTC (його налаштувати через сторінну або через GPS), і заряд батереї.
-	2.  Статус роботи, Час роботи (дні, години, хвилини, секунди)
-	3. 	Вивести IP сервера ESP32, до якого можна підключитися.
-	4.	
-	5. 
-
+ 
 	CURRENT:
-		1. Вивести дату і час на 0 рядок дисплею
-		2. 
-
-		4. Переробити на новий веб сервер.
-		1. Запускати HTTP server з SMS командою.
-
-	BUGS:
-
+		2. Вмикати і вимикати WiFi через SMS
+		3. Синхронізувати годинник RTC з GPS в момент пергшого підключення до GPS
+		4. Вмикати і вимикати логування і GPS кнопкою
+	
 
 	TASKS:
 		4. Зробити реалізацію кнопки старту і стопу запису GPS даних. (кнопка має знати стан GPS логера, чи він включений чи ні) Додати кнопки LogON logOFF і point
@@ -510,7 +772,14 @@ void app_main(void)
 		2. Записувати мій номер в конфізі.
 		2. Залити проект з VS Code і новою версією плати на ГітХАБ
 		3. Зробити інтерфейс запису і стирання даних на дисплей
-
+		4. Якщо логуються доні, то виводити на OLED 
+		1. Вивести дату і час на 0 рядок дисплею
+		3. 	Вивести IP сервера ESP32, до якого можна підключитися.
+		4. Переробити на новий веб сервер.
+		1. Вивести в дрогому рядку режим роботи wifi 
+		7. Вивести в третьому рядку виданий IP коли отриманий IP від роутера, або в режимі AP (ТОчка доступу) IP+config 
+		5. Вивести час логування в файл на 4 ряжку OLED
+		1. Доробити вивід даних на OLED
 */
 }
 // ------------------------------------------------------------------------------------------------------------------

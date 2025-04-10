@@ -27,6 +27,8 @@
     "uart.h": "c",
     "cstdlib": "c",
     "nvs_flash.h": "c",
-    "sta.h": "c"
+    "sta.h": "c",
+    "*.inc": "cpp",
+    "wifi.h": "c"
   }
 }

@@ -2,6 +2,8 @@
 
 extern httpd_handle_t ap_server_handle;
 
+extern QueueHandle_t dysplay_wifi_mode_and_ip_queue;
+
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
@@ -142,6 +144,12 @@ void start_wifi_ap(void)
  
     
     ESP_LOGI("WiFi AP", "AP started. Connect to %s, and visit http://192.168.4.1/config to set Wi-Fi credentials.", wifi_config.ap.ssid);
+
+    // Вивести дані на OLED
+    dysplay_wifi_t dysplay_wifi;
+    strcpy(dysplay_wifi.wifi_mode, "AP");          // Запис режиму
+    strcpy(dysplay_wifi.wifi_ip, "AP: ESP32_Confighttp://192.168.4.1/config");     // Запис IP  
+    xQueueSend(dysplay_wifi_mode_and_ip_queue, &dysplay_wifi, pdMS_TO_TICKS(100));   // передати для екрнана
 
     vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка перед запуском HTTP-сервера
 

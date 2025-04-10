@@ -7,6 +7,8 @@
 
 #include "gsm_sim800l.h"
 
+extern QueueHandle_t dysplay_gps_data_queue;
+
 
 static const char *GSM_TAG = "GSM";
 
@@ -59,16 +61,24 @@ void turn_OFF_power_of_gsm_module(void)
 // GSM commands handlers
 void command_1_turn_on_gps_log_handler(void)
 {
-	make_led_blink(BLUE_LED, 200, 10);    
-
+	//dysplay_gps_log_status_t dysplay_gps_log_status_data;
+	make_led_blink(BLUE_LED, 200, 10);   
+	 
 	gps_log_on();
+
+	// dysplay_gps_log_status_data.print_on_oled_status = 0;
+	// xQueueSend(dysplay_gps_data_queue, (void*)&dysplay_gps_log_status_data, pdMS_TO_TICKS(100));
 }
 // ------------------------------------------------------------------------------------------------------------
 void command_2_turn_off_gps_log_handler(void)
 {
+	//dysplay_gps_log_status_t dysplay_gps_log_status_data;
 	make_led_blink(BLUE_LED, 50, 10);
 	
 	gps_log_off();
+
+	// dysplay_gps_log_status_data.print_on_oled_status = 1;
+	// xQueueSend(dysplay_gps_data_queue, (void*)&dysplay_gps_log_status_data, pdMS_TO_TICKS(100));
 }
 // ------------------------------------------------------------------------------------------------------------
 void command_3_send_one_point_gps_data_handler(void)
@@ -86,12 +96,12 @@ void command_4_restart_handler(void)
 // ------------------------------------------------------------------------------------------------------------
 void command_5_start_web_server_handler(void)
 {
-	
+	wifi_start();
 }
 
 void command_6_stop_web_server_handler(void)
 {
-	
+	wifi_stop();
 }
 
 // Structure for command and handler
@@ -106,8 +116,8 @@ command_t command_list[] = {
 	{"logOFF", command_2_turn_off_gps_log_handler},
 	{"point", command_3_send_one_point_gps_data_handler},
 	{"restart", command_4_restart_handler},
-	{"webstart", command_5_start_web_server_handler},
-	{"webstop", command_6_stop_web_server_handler},
+	{"wifi_start", command_5_start_web_server_handler},
+	{"wifi_stop", command_6_stop_web_server_handler},
 };
 
 #define COMMAND_COUNT (sizeof(command_list)/sizeof(command_list[0]))		// How many commands defined

@@ -19,6 +19,8 @@ extern QueueHandle_t GPS_queue;
 extern bool gps_log_working_flag;
 extern bool init_gps_status_flag;
 
+extern QueueHandle_t dysplay_gps_data_queue;
+
 extern TaskHandle_t task_log_data_into_file_handlr;
 extern TaskHandle_t task_get_gps_data_one_time_handler;
 
@@ -234,6 +236,11 @@ void gps_log_off(void)
 		gpio_set_level(CONFIG_GREEN_GPIO, 0);
 		init_gps_status_flag = false;
 		gps_log_working_flag = false;
+
+		// For delete data from OLED
+		dysplay_gps_log_status_t dysplay_gps_log_status_data;
+		dysplay_gps_log_status_data.print_on_oled_status = 1;
+		xQueueSend(dysplay_gps_data_queue, (void*)&dysplay_gps_log_status_data, pdMS_TO_TICKS(100));
 	}
 	else
 	{
@@ -241,6 +248,7 @@ void gps_log_off(void)
 			send_sms_message_plus_battery_level("GPS log was stop!");
 		#endif
 	}
+
 	
 }
 // -----------------------------------------------------------------------------------------------------

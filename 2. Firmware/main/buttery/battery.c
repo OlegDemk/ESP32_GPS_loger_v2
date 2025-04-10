@@ -50,8 +50,9 @@ uint8_t raad_barrety_level(void)
 	{
 		battery_level = 100;
 	}
-
-	ESP_LOGI("ADC", "Battery voltage: %0.1f, Battery level: %d ", battery_voltage, battery_level);
+	#if LOG_BATTERT_LEVEL
+		ESP_LOGI("ADC", "Battery voltage: %0.1f, Battery level: %d ", battery_voltage, battery_level);
+	#endif
 
 	return battery_level;
 }

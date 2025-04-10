@@ -2,6 +2,8 @@
 
 #define MAX_RETRY_COUNT 3
 
+extern QueueHandle_t dysplay_wifi_mode_and_ip_queue;
+
 httpd_handle_t ap_server_handle = NULL;
 httpd_handle_t sta_server_handle = NULL;
 
@@ -76,11 +78,11 @@ void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, voi
             stop_webserver(&sta_server_handle);
 
             // Видалити задачу, якщо вона була створина до цього
-            if(increment_counter_task_handler != NULL)
-            {
-                vTaskDelete(increment_counter_task_handler);
-                increment_counter_task_handler = NULL;
-            }
+            // if(increment_counter_task_handler != NULL)
+            // {
+            //     vTaskDelete(increment_counter_task_handler);
+            //     increment_counter_task_handler = NULL;
+            // }
             
             retry_count = 0;  // Скидаємо лічильник для майбутніх підключень
 
@@ -103,10 +105,16 @@ void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, voi
 
         retry_count = 0;  // Скидаємо лічильник при успішному підключенні
 
+        // Вивести дані на OLED
+        dysplay_wifi_t dysplay_wifi;
+        strcpy(dysplay_wifi.wifi_mode, "STA");          // Запис режиму
+        snprintf(dysplay_wifi.wifi_ip, sizeof(dysplay_wifi.wifi_ip), IPSTR, IP2STR(&event->ip_info.ip));    // Запис IP
+        xQueueSend(dysplay_wifi_mode_and_ip_queue, &dysplay_wifi, pdMS_TO_TICKS(100));   // передати для екрнана
+
         ESP_LOGI(TAG, "START HTTP SERVER");                                                 // реагує в браузері на: http://192.168.0.137/counter <<<<<<<<<<<<<<<<<<<<<<<<,  
         //start_webserver_sta();                          // Запуск HTTP-сервера 
         NEW_start_webserver_sta();
-        xTaskCreate(&increment_counter_task, "increment_counter_task", 4096, NULL, 5, &increment_counter_task_handler);
+        // xTaskCreate(&increment_counter_task, "increment_counter_task", 4096, NULL, 5, &increment_counter_task_handler);
     }
 }
 // -----------------------------------------------------------------------------------------------------
@@ -140,6 +148,62 @@ void wifi_start(void)
 		start_wifi_ap();
 		start_webserver_ap();
 	}
+}
+// -----------------------------------------------------------------------------------------------------
+void wifi_stop(void)
+{
+    ESP_LOGI("WiFi", "Stopping Wi-Fi and cleaning up...");
+
+    // 1. Зупинити всі можливі вебсервери
+    stop_webserver(&ap_server_handle);
+    stop_webserver(&sta_server_handle);
+
+    // // 2. Видалити задачу, яка була створена у STA режимі
+    // if(increment_counter_task_handler != NULL)
+    // {
+    //     vTaskDelete(increment_counter_task_handler);
+    //     increment_counter_task_handler = NULL;
+    // }
+
+    // 3. Зупинити саму WiFi підсистему
+    ESP_ERROR_CHECK(esp_wifi_stop());
+    ESP_ERROR_CHECK(esp_wifi_deinit());
+
+    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   BUG Тут перезагрузка
+
+    // 4. Видалити WiFi інтерфейси
+   // esp_netif_destroy_default_wifi();   
+
+   
+
+    // Видалити event loop, якщо створений
+    esp_err_t err = esp_event_loop_delete_default();
+    if (err == ESP_OK)
+    {
+        ESP_LOGI("WIFI", "Default event loop deleted successfully");
+    }
+    else if (err == ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGW("WIFI", "Event loop was not created or already deleted");
+    }
+    else
+    {
+        ESP_LOGE("WIFI", "Failed to delete event loop: %s", esp_err_to_name(err));
+    }
+
+
+    //esp_netif_destroy(esp_netif_t *esp_netif);
+   
+
+    // 4. Очистити інформацію на екрані
+    dysplay_wifi_t dysplay_wifi;
+    strcpy(dysplay_wifi.wifi_mode, "OFF");
+    strcpy(dysplay_wifi.wifi_ip, "WiFi OFF");
+
+    // 5. Вивести це на OLED через чергу
+    xQueueSend(dysplay_wifi_mode_and_ip_queue, &dysplay_wifi, pdMS_TO_TICKS(100));
+
+    ESP_LOGI("WiFi", "Wi-Fi stopped successfully.");
 }
 // -----------------------------------------------------------------------------------------------------
 

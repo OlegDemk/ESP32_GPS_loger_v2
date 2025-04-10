@@ -10,3 +10,4 @@ void stop_webserver(httpd_handle_t *server_handle);
 void save_wifi_config(const char *ssid, const char *password);
 void get_saved_wifi_config(char *ssid, char *password);
 void wifi_start(void);
+void wifi_stop(void);

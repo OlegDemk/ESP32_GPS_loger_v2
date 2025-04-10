@@ -82,7 +82,7 @@ void test_rtc_ds3231m(void)
         ESP_LOGI(TAG_RTC, "Set test time 11 12 13");
         ds3231m_set_time(11, 12, 13);
         ESP_LOGI(TAG_RTC, "Set test date 1 10 10 10");
-        ds3231m_set_date(1, 10, 10, 10);
+        ds3231m_set_date(1, 11, 11, 25);
         init_rtc = true;
     }
     vTaskDelay(10/portTICK_PERIOD_MS);
